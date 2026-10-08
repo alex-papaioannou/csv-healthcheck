@@ -8,4 +8,4 @@ permissions:
   contents: read
 jobs:
   python:
-    uses: alex-papaioannou/python-ci-workflows/.github/workflows/python-ci.yml@cb5b63739a0c2c79cd69483a37e56479e21ddb1c
+    uses: alex-papaioannou/python-ci-workflows/.github/workflows/python-ci.yml@610d93e05cf1f02471c7ba3b9b3e9658f5e3e4b1
