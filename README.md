@@ -69,3 +69,5 @@ Pipe text using `cat data.csv | csv-healthcheck -`. The Python API also accepts 
 Use `--encoding latin1` (API: `encoding="latin1"`) for explicitly encoded files. The default is UTF-8 with optional BOM. Invalid encoding names and undecodable input return exit code 2; no guessing or lossy replacement is performed.
 
 Files ending in `.gz` are decompressed as a stream, including uppercase `.GZ`. Use `csv-healthcheck input.csv.gz`; malformed or truncated gzip input returns exit code 2. Compressed stdin is not auto-detected.
+
+`--quotechar` selects a single quoting character (default double quote). For example, use `--quotechar "'"` for single-quoted fields; newline and NUL are rejected.
