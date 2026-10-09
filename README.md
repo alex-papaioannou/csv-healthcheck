@@ -56,3 +56,8 @@ Update that SHA through a pull request when adopting workflow changes.
 
 Useful next contributions: data-type validation and configurable issue limits.
 Include tests and usage examples with PRs.
+
+## Installation
+
+From a checkout, run `python -m pip install .`, then `csv-healthcheck data.csv`.
+The existing `python csv_healthcheck.py` and `python -m csv_healthcheck` entry points remain supported. Installation needs a build backend; runtime uses only the standard library. This repository is not yet published to PyPI.
