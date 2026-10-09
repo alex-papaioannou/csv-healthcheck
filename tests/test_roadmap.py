@@ -59,3 +59,7 @@ class FeatureTests(unittest.TestCase):
     def test_custom_quote_character(self):
         self.assertEqual(self.inspect("a,b\n'x,y',1\n", quotechar="'")['issues'], [])
         with self.assertRaises(ValueError): self.inspect('a\n1\n', quotechar='xx')
+
+    def test_escaped_separator(self):
+        self.assertEqual(self.inspect('a,b\nx!,y,1\n', escapechar='!')['issues'], [])
+        with self.assertRaises(ValueError): self.inspect('a\n1\n', escapechar='')

@@ -42,10 +42,12 @@ def duplicate_index(storage):
                 yield record
 
 
-def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"'):
+def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"', escapechar=None):
     """Return structural quality counts and issues for a CSV file."""
     if not isinstance(quotechar, str) or len(quotechar) != 1 or quotechar in "\r\n\0":
         raise ValueError("quotechar must be one character other than a newline or NUL")
+    if escapechar is not None and (not isinstance(escapechar, str) or len(escapechar) != 1 or escapechar in "\r\n\0"):
+        raise ValueError("escapechar must be a single non-newline, non-NUL character")
     codecs.lookup(encoding)
     if duplicate_storage not in ("memory", "disk"):
         raise ValueError("duplicate_storage must be 'memory' or 'disk'")
@@ -68,7 +70,7 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
     else:
         source_context = Path(path).open(encoding=encoding, newline="")
     with source_context as source, duplicate_index(duplicate_storage) as record:
-        reader = csv.reader(source, strict=True, delimiter=delimiter, quotechar=quotechar)
+        reader = csv.reader(source, strict=True, delimiter=delimiter, quotechar=quotechar, escapechar=escapechar)
         header = next(reader, None)
         if header is None:
             return {"rows": 0, "columns": 0, "missing_values": 0,
@@ -108,12 +110,13 @@ def main(argv=None):
                         help="Store unique rows in memory or temporary SQLite storage")
     parser.add_argument("--encoding", default="utf-8-sig", help="File text encoding; streams are already decoded")
     parser.add_argument("--quotechar", default='"', help="Single quoting character")
+    parser.add_argument("--escapechar", help="Optional CSV escape character")
     args = parser.parse_args(argv)
     try:
         source = sys.stdin if str(args.path) == "-" else args.path
         report = inspect_csv(source, delimiter=args.delimiter,
                              required_columns=args.require_column,
-                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar)
+                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar, escapechar=args.escapechar)
     except (OSError, EOFError, UnicodeError, csv.Error, ValueError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
