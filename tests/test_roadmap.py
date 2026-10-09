@@ -37,3 +37,11 @@ class FeatureTests(unittest.TestCase):
         with mock.patch('sys.stdin', stream), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(app.main(['-']), 0)
         self.assertFalse(stream.closed)
+
+    def test_latin1_file_and_invalid_encoding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'latin.csv'
+            path.write_bytes('name\ncafé\n'.encode('latin1'))
+            self.assertEqual(app.inspect_csv(path, encoding='latin1')['rows'], 1)
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(app.main([str(path), '--encoding', 'not-an-encoding']), 2)

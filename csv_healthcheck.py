@@ -4,6 +4,7 @@ __version__ = "0.1.0"
 
 import argparse
 import csv
+import codecs
 import json
 import sqlite3
 import sys
@@ -40,8 +41,9 @@ def duplicate_index(storage):
                 yield record
 
 
-def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory"):
+def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig"):
     """Return structural quality counts and issues for a CSV file."""
+    codecs.lookup(encoding)
     if duplicate_storage not in ("memory", "disk"):
         raise ValueError("duplicate_storage must be 'memory' or 'disk'")
     if not isinstance(delimiter, str) or len(delimiter) != 1 or delimiter in "\r\n\0":
@@ -56,7 +58,7 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
             required.append(name.strip())
     issues = []
     missing = duplicates = rows = 0
-    source_context = nullcontext(path) if hasattr(path, "read") else Path(path).open(encoding="utf-8-sig", newline="")
+    source_context = nullcontext(path) if hasattr(path, "read") else Path(path).open(encoding=encoding, newline="")
     with source_context as source, duplicate_index(duplicate_storage) as record:
         reader = csv.reader(source, strict=True, delimiter=delimiter)
         header = next(reader, None)
@@ -96,13 +98,14 @@ def main(argv=None):
                         help="Require a header name; repeat for multiple columns")
     parser.add_argument("--duplicate-storage", choices=("memory", "disk"), default="memory",
                         help="Store unique rows in memory or temporary SQLite storage")
+    parser.add_argument("--encoding", default="utf-8-sig", help="File text encoding; streams are already decoded")
     args = parser.parse_args(argv)
     try:
         source = sys.stdin if str(args.path) == "-" else args.path
         report = inspect_csv(source, delimiter=args.delimiter,
                              required_columns=args.require_column,
-                             duplicate_storage=args.duplicate_storage)
-    except (OSError, UnicodeError, csv.Error, ValueError, sqlite3.Error) as error:
+                             duplicate_storage=args.duplicate_storage, encoding=args.encoding)
+    except (OSError, UnicodeError, csv.Error, ValueError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2))
