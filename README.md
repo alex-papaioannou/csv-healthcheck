@@ -25,7 +25,18 @@ Python 3.11+ required. Output is JSON. Exit codes: `0` clean, `1` quality issues
 whitespace-only cells count as missing, including absent trailing fields. Duplicate
 comparison preserves whitespace. The first record is always the header.
 
-This is a structural checker, not a schema or financial-data validator. Duplicate
+To enforce required headers, repeat `--require-column`:
+
+```sh
+python csv_healthcheck.py examples/clean.csv --require-column symbol --require-column price
+```
+
+Names are case-sensitive and stripped of surrounding whitespace. Extra columns
+and any column order are allowed. Missing required names produce quality issues
+(exit code 1); blank required names are invalid configuration (exit code 2).
+The Python API accepts `required_columns=["symbol", "price"]`.
+
+This is a structural checker, not a data-type or financial-data validator. Duplicate
 detection stores unique rows in memory; use it for files that fit available memory.
 Issue output also grows with the number of malformed records.
 

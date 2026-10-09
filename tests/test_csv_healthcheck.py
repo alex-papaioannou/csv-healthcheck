@@ -8,11 +8,39 @@ from csv_healthcheck import inspect_csv, main
 
 
 class CsvTests(unittest.TestCase):
-    def report(self, content, delimiter=","):
+    def report(self, content, delimiter=",", **options):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "data.csv"
             path.write_text(content, encoding="utf-8")
-            return inspect_csv(path, delimiter=delimiter)
+            return inspect_csv(path, delimiter=delimiter, **options)
+
+    def test_required_columns_allow_order_and_trim_whitespace(self):
+        result = self.report(" value ,name\n1,x\n",
+                             required_columns=["name", " value "])
+        self.assertEqual(result["issues"], [])
+
+    def test_missing_required_columns_are_case_sensitive_and_deduplicated(self):
+        result = self.report("name,value\nx,1\n",
+                             required_columns=["Name", "price", "price"])
+        self.assertEqual(result["issues"], ["Missing required column: Name",
+                                             "Missing required column: price"])
+        self.assertEqual(result["rows"], 1)
+
+    def test_invalid_required_column_names(self):
+        for names in ([""], [" "], [7], "name"):
+            with self.subTest(names=names), self.assertRaises(ValueError):
+                self.report("name\nx\n", required_columns=names)
+
+    def test_cli_required_columns(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "data.csv"
+            path.write_text("name,value\nx,1\n", encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(main([str(path), "--require-column", "name",
+                                       "--require-column", "value"]), 0)
+                self.assertEqual(main([str(path), "--require-column", "price"]), 1)
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([str(path), "--require-column", ""]), 2)
 
     def test_semicolon_delimiter_preserves_quoted_fields(self):
         result = self.report('name;value\n"a;b";1\n', delimiter=";")
