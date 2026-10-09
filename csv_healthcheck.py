@@ -147,6 +147,17 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
             "issue_details": issues.details, "issues_truncated": issues.total - len(issues)}
 
 
+def render_text(report):
+    lines = [f"Rows: {report['rows']} | Columns: {report['columns']}",
+             f"Missing values: {report['missing_values']} | Duplicate rows: {report['duplicate_rows']}"]
+    lines.extend(report["issues"])
+    if report["issues_truncated"]:
+        lines.append(f"Omitted issue messages: {report['issues_truncated']}")
+    if not report["issue_count"]:
+        lines.append("No quality issues found")
+    return "\n".join(lines)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -163,6 +174,7 @@ def main(argv=None):
     parser.add_argument("--blank-records", choices=("keep", "skip"), default="keep")
     parser.add_argument("--field-size-limit", type=int, help="Maximum CSV field length in characters")
     parser.add_argument("--max-issues", type=int, help="Maximum stored messages; counts remain complete")
+    parser.add_argument("--format", choices=("json", "text"), default="json")
     args = parser.parse_args(argv)
     try:
         source = sys.stdin if str(args.path) == "-" else args.path
@@ -172,7 +184,7 @@ def main(argv=None):
     except (OSError, EOFError, UnicodeError, csv.Error, ValueError, OverflowError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
-    print(json.dumps(report, indent=2))
+    print(render_text(report) if args.format == "text" else json.dumps(report, indent=2))
     return 1 if report["issue_count"] else 0
 
 
