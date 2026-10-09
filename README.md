@@ -26,5 +26,3 @@ Update that SHA through a pull request when adopting workflow changes.
 
 Useful next contributions: configurable delimiters, schema validation, and an
 optional disk-backed duplicate index. Include tests and usage examples with PRs.
-
-Initial implementation prepared with AI assistance.
