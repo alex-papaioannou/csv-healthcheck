@@ -8,6 +8,7 @@ import codecs
 import json
 import gzip
 import itertools
+import inspect
 import os
 import threading
 import sqlite3
@@ -175,8 +176,20 @@ def write_report(path, content):
             temporary.unlink(missing_ok=True)
 
 
+def load_config(path):
+    with Path(path).open(encoding="utf-8") as source:
+        config = json.load(source)
+    if not isinstance(config, dict):
+        raise ValueError("Configuration must be a JSON object")
+    allowed = set(inspect.signature(inspect_csv).parameters) - {"path"}
+    unknown = set(config) - allowed
+    if unknown:
+        raise ValueError("Unknown configuration keys: " + ", ".join(sorted(unknown)))
+    return config
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("path", type=Path)
     parser.add_argument("--delimiter", default=",", help="Field separator (default: comma)")
@@ -193,14 +206,29 @@ def main(argv=None):
     parser.add_argument("--max-issues", type=int, help="Maximum stored messages; counts remain complete")
     parser.add_argument("--format", choices=("json", "text"), default="json")
     parser.add_argument("--output", type=Path, help="Atomically replace a report file")
-    args = parser.parse_args(argv)
+    parser.add_argument("--config", type=Path, help="JSON inspection options; CLI values override")
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    args = parser.parse_args(arguments)
     try:
         if args.output and str(args.path) != "-" and args.output.resolve() == args.path.resolve():
             raise ValueError("Output must not overwrite input")
         source = sys.stdin if str(args.path) == "-" else args.path
-        report = inspect_csv(source, delimiter=args.delimiter,
-                             required_columns=args.require_column,
-                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar, escapechar=args.escapechar, header=not args.no_header, blank_records=args.blank_records, field_size_limit=args.field_size_limit, max_issues=args.max_issues)
+        options = load_config(args.config) if args.config else {}
+        cli_options = {"delimiter": ("--delimiter", args.delimiter),
+                       "required_columns": ("--require-column", args.require_column),
+                       "duplicate_storage": ("--duplicate-storage", args.duplicate_storage),
+                       "encoding": ("--encoding", args.encoding),
+                       "quotechar": ("--quotechar", args.quotechar),
+                       "escapechar": ("--escapechar", args.escapechar),
+                       "header": ("--no-header", not args.no_header),
+                       "blank_records": ("--blank-records", args.blank_records),
+                       "field_size_limit": ("--field-size-limit", args.field_size_limit),
+                       "max_issues": ("--max-issues", args.max_issues)}
+        supplied = {arg.split("=", 1)[0] for arg in arguments if arg.startswith("--")}
+        for key, (flag, value) in cli_options.items():
+            if flag in supplied:
+                options[key] = value
+        report = inspect_csv(source, **options)
     except (OSError, EOFError, UnicodeError, csv.Error, ValueError, OverflowError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2

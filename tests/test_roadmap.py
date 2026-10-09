@@ -118,3 +118,11 @@ class FeatureTests(unittest.TestCase):
             self.assertEqual(list(Path(directory).iterdir()), [path])
             app.write_report(path, 'new')
             self.assertEqual(path.read_text(), 'new\n')
+
+    def test_configuration_and_explicit_cli_override(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'config.json'
+            config.write_text(json.dumps({'delimiter': ';', 'required_columns': ['a']}))
+            for extra, text in (([], 'a;b\n1;2\n'), (['--delimiter=,'], 'a,b\n1,2\n')):
+                with mock.patch('sys.stdin', io.StringIO(text)), contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(app.main(['-', '--config', str(config)] + extra), 0)
