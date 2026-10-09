@@ -7,10 +7,18 @@ import sys
 from pathlib import Path
 
 
-def inspect_csv(path, delimiter=","):
+def inspect_csv(path, delimiter=",", required_columns=()):
     """Return counts and issues; duplicate detection uses memory proportional to rows."""
     if not isinstance(delimiter, str) or len(delimiter) != 1 or delimiter in "\r\n\0":
         raise ValueError("delimiter must be one character other than a newline or NUL")
+    if isinstance(required_columns, str):
+        raise ValueError("required_columns must be a sequence of column names")
+    required = []
+    for name in required_columns:
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("required column names must be nonempty strings")
+        if name.strip() not in required:
+            required.append(name.strip())
     issues = []
     missing = duplicates = rows = 0
     seen = set()
@@ -25,6 +33,9 @@ def inspect_csv(path, delimiter=","):
             issues.append("Header contains an empty column name")
         if len(set(names)) != len(names):
             issues.append("Header contains duplicate column names")
+        for name in required:
+            if name not in names:
+                issues.append(f"Missing required column: {name}")
         for row in reader:
             rows += 1
             if len(row) != len(header):
@@ -47,9 +58,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("path", type=Path)
     parser.add_argument("--delimiter", default=",", help="Field separator (default: comma)")
+    parser.add_argument("--require-column", action="append", default=[],
+                        help="Require a header name; repeat for multiple columns")
     args = parser.parse_args(argv)
     try:
-        report = inspect_csv(args.path, delimiter=args.delimiter)
+        report = inspect_csv(args.path, delimiter=args.delimiter,
+                             required_columns=args.require_column)
     except (OSError, UnicodeError, csv.Error, ValueError) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
