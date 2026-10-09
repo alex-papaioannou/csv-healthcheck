@@ -1,5 +1,7 @@
 """Inspect CSV structure without third-party runtime dependencies."""
 
+__version__ = "0.1.0"
+
 import argparse
 import csv
 import json
@@ -87,6 +89,7 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("path", type=Path)
     parser.add_argument("--delimiter", default=",", help="Field separator (default: comma)")
     parser.add_argument("--require-column", action="append", default=[],

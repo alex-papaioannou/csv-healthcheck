@@ -61,3 +61,5 @@ Include tests and usage examples with PRs.
 
 From a checkout, run `python -m pip install .`, then `csv-healthcheck data.csv`.
 The existing `python csv_healthcheck.py` and `python -m csv_healthcheck` entry points remain supported. Installation needs a build backend; runtime uses only the standard library. This repository is not yet published to PyPI.
+
+Use `csv-healthcheck --version` to print the package version without opening an input file.
