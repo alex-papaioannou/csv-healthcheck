@@ -73,3 +73,5 @@ Files ending in `.gz` are decompressed as a stream, including uppercase `.GZ`. U
 `--quotechar` selects a single quoting character (default double quote). For example, use `--quotechar "'"` for single-quoted fields; newline and NUL are rejected.
 
 `--escapechar` enables CSV escaping, for example `--escapechar '!'` treats `x!,y` as one field. Escaping is disabled by default; doubled quotes remain supported.
+
+`--no-header` (API: `header=False`) treats the first record as data, fixes width from that record, and names columns `column_1`, `column_2`, etc. An empty file remains a quality issue.

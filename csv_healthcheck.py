@@ -7,6 +7,7 @@ import csv
 import codecs
 import json
 import gzip
+import itertools
 import sqlite3
 import sys
 import tempfile
@@ -42,8 +43,10 @@ def duplicate_index(storage):
                 yield record
 
 
-def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"', escapechar=None):
+def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"', escapechar=None, header=True):
     """Return structural quality counts and issues for a CSV file."""
+    if not isinstance(header, bool):
+        raise ValueError("header must be boolean")
     if not isinstance(quotechar, str) or len(quotechar) != 1 or quotechar in "\r\n\0":
         raise ValueError("quotechar must be one character other than a newline or NUL")
     if escapechar is not None and (not isinstance(escapechar, str) or len(escapechar) != 1 or escapechar in "\r\n\0"):
@@ -62,6 +65,7 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
         if name.strip() not in required:
             required.append(name.strip())
     issues = []
+    has_header = header
     missing = duplicates = rows = 0
     if hasattr(path, "read"):
         source_context = nullcontext(path)
@@ -75,6 +79,9 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
         if header is None:
             return {"rows": 0, "columns": 0, "missing_values": 0,
                     "duplicate_rows": 0, "issues": ["Empty file"]}
+        if not has_header:
+            reader = itertools.chain([header], reader)
+            header = [f"column_{i + 1}" for i in range(len(header))]
         names = [name.strip() for name in header]
         if not names or any(not name for name in names):
             issues.append("Header contains an empty column name")
@@ -111,12 +118,13 @@ def main(argv=None):
     parser.add_argument("--encoding", default="utf-8-sig", help="File text encoding; streams are already decoded")
     parser.add_argument("--quotechar", default='"', help="Single quoting character")
     parser.add_argument("--escapechar", help="Optional CSV escape character")
+    parser.add_argument("--no-header", action="store_true", help="Generate column_1, column_2, ... names")
     args = parser.parse_args(argv)
     try:
         source = sys.stdin if str(args.path) == "-" else args.path
         report = inspect_csv(source, delimiter=args.delimiter,
                              required_columns=args.require_column,
-                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar, escapechar=args.escapechar)
+                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar, escapechar=args.escapechar, header=not args.no_header)
     except (OSError, EOFError, UnicodeError, csv.Error, ValueError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
