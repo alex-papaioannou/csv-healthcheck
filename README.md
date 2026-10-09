@@ -77,3 +77,5 @@ Files ending in `.gz` are decompressed as a stream, including uppercase `.GZ`. U
 `--no-header` (API: `header=False`) treats the first record as data, fixes width from that record, and names columns `column_1`, `column_2`, etc. An empty file remains a quality issue.
 
 `--blank-records skip` omits truly empty records before header selection and validation. The default is `keep`. Quoted empty fields and whitespace-only fields are data records, not blank records. Reported record numbers count retained data records.
+
+`--field-size-limit 1000000` sets a positive maximum field length in characters for this inspection. The previous Python CSV limit is restored even on errors. Calls within this module serialize limit changes; unrelated code calling `csv.field_size_limit` concurrently is outside this lock.

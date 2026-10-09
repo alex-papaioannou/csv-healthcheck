@@ -8,11 +8,29 @@ import codecs
 import json
 import gzip
 import itertools
+import threading
 import sqlite3
 import sys
 import tempfile
 from contextlib import closing, contextmanager, nullcontext
 from pathlib import Path
+
+
+_field_lock = threading.RLock()
+
+
+@contextmanager
+def field_limit(value):
+    if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value <= 0):
+        raise ValueError("field_size_limit must be a positive integer")
+    with _field_lock:
+        previous = csv.field_size_limit()
+        try:
+            if value is not None:
+                csv.field_size_limit(value)
+            yield
+        finally:
+            csv.field_size_limit(previous)
 
 
 @contextmanager
@@ -43,7 +61,7 @@ def duplicate_index(storage):
                 yield record
 
 
-def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"', escapechar=None, header=True, blank_records="keep"):
+def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"', escapechar=None, header=True, blank_records="keep", field_size_limit=None):
     """Return structural quality counts and issues for a CSV file."""
     if blank_records not in ("keep", "skip"):
         raise ValueError("blank_records must be keep or skip")
@@ -75,7 +93,7 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
         source_context = gzip.open(path, "rt", encoding=encoding, newline="")
     else:
         source_context = Path(path).open(encoding=encoding, newline="")
-    with source_context as source, duplicate_index(duplicate_storage) as record:
+    with source_context as source, field_limit(field_size_limit), duplicate_index(duplicate_storage) as record:
         reader = csv.reader(source, strict=True, delimiter=delimiter, quotechar=quotechar, escapechar=escapechar)
         if blank_records == "skip":
             reader = (row for row in reader if row)
@@ -124,13 +142,14 @@ def main(argv=None):
     parser.add_argument("--escapechar", help="Optional CSV escape character")
     parser.add_argument("--no-header", action="store_true", help="Generate column_1, column_2, ... names")
     parser.add_argument("--blank-records", choices=("keep", "skip"), default="keep")
+    parser.add_argument("--field-size-limit", type=int, help="Maximum CSV field length in characters")
     args = parser.parse_args(argv)
     try:
         source = sys.stdin if str(args.path) == "-" else args.path
         report = inspect_csv(source, delimiter=args.delimiter,
                              required_columns=args.require_column,
-                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar, escapechar=args.escapechar, header=not args.no_header, blank_records=args.blank_records)
-    except (OSError, EOFError, UnicodeError, csv.Error, ValueError, LookupError, sqlite3.Error) as error:
+                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar, escapechar=args.escapechar, header=not args.no_header, blank_records=args.blank_records, field_size_limit=args.field_size_limit)
+    except (OSError, EOFError, UnicodeError, csv.Error, ValueError, OverflowError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2))

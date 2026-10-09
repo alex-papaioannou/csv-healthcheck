@@ -75,3 +75,11 @@ class FeatureTests(unittest.TestCase):
         report = self.inspect('\na\n\n1\n""\n', blank_records='skip')
         self.assertEqual(report['rows'], 2)
         self.assertEqual(report['missing_values'], 1)
+
+    def test_field_size_limit_restored_after_failure(self):
+        import csv
+        previous = csv.field_size_limit()
+        with self.assertRaises(csv.Error): self.inspect('a\nlongvalue\n', field_size_limit=3)
+        self.assertEqual(csv.field_size_limit(), previous)
+        self.assertEqual(self.inspect('a\nlongvalue\n', field_size_limit=20)['rows'], 1)
+        with self.assertRaises(ValueError): self.inspect('a\n1\n', field_size_limit=0)
