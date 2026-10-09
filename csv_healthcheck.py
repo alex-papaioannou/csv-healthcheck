@@ -7,13 +7,15 @@ import sys
 from pathlib import Path
 
 
-def inspect_csv(path):
+def inspect_csv(path, delimiter=","):
     """Return counts and issues; duplicate detection uses memory proportional to rows."""
+    if not isinstance(delimiter, str) or len(delimiter) != 1 or delimiter in "\r\n\0":
+        raise ValueError("delimiter must be one character other than a newline or NUL")
     issues = []
     missing = duplicates = rows = 0
     seen = set()
     with Path(path).open(encoding="utf-8-sig", newline="") as source:
-        reader = csv.reader(source, strict=True)
+        reader = csv.reader(source, strict=True, delimiter=delimiter)
         header = next(reader, None)
         if header is None:
             return {"rows": 0, "columns": 0, "missing_values": 0,
@@ -44,10 +46,11 @@ def inspect_csv(path):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("path", type=Path)
+    parser.add_argument("--delimiter", default=",", help="Field separator (default: comma)")
     args = parser.parse_args(argv)
     try:
-        report = inspect_csv(args.path)
-    except (OSError, UnicodeError, csv.Error) as error:
+        report = inspect_csv(args.path, delimiter=args.delimiter)
+    except (OSError, UnicodeError, csv.Error, ValueError) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2))

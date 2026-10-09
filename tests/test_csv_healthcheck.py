@@ -8,11 +8,37 @@ from csv_healthcheck import inspect_csv, main
 
 
 class CsvTests(unittest.TestCase):
-    def report(self, content):
+    def report(self, content, delimiter=","):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "data.csv"
             path.write_text(content, encoding="utf-8")
-            return inspect_csv(path)
+            return inspect_csv(path, delimiter=delimiter)
+
+    def test_semicolon_delimiter_preserves_quoted_fields(self):
+        result = self.report('name;value\n"a;b";1\n', delimiter=";")
+        self.assertEqual(result["columns"], 2)
+        self.assertEqual(result["issues"], [])
+
+    def test_tab_delimiter_detects_missing_values(self):
+        result = self.report("a\tb\n1\t\n", delimiter="\t")
+        self.assertEqual(result["columns"], 2)
+        self.assertEqual(result["missing_values"], 1)
+
+    def test_invalid_delimiters(self):
+        for delimiter in ("", "||", "\n", "\r", "\0", None):
+            with self.subTest(delimiter=delimiter), self.assertRaises(ValueError):
+                self.report("a,b\n1,2\n", delimiter=delimiter)
+
+    def test_cli_delimiter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "data.csv"
+            path.write_text("a;b\n1;2\n", encoding="utf-8")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(main([str(path), "--delimiter", ";"]), 0)
+            self.assertIn('"columns": 2', output.getvalue())
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main([str(path), "--delimiter", "||"]), 2)
 
     def test_valid_quoted_csv(self):
         result = self.report('name,value\n"a,b",1\n"two\nlines",2\n')
