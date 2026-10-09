@@ -67,3 +67,5 @@ Use `csv-healthcheck --version` to print the package version without opening an 
 Pipe text using `cat data.csv | csv-healthcheck -`. The Python API also accepts text streams and leaves caller-owned streams open. Stdin uses the interpreter's text decoding.
 
 Use `--encoding latin1` (API: `encoding="latin1"`) for explicitly encoded files. The default is UTF-8 with optional BOM. Invalid encoding names and undecodable input return exit code 2; no guessing or lossy replacement is performed.
+
+Files ending in `.gz` are decompressed as a stream, including uppercase `.GZ`. Use `csv-healthcheck input.csv.gz`; malformed or truncated gzip input returns exit code 2. Compressed stdin is not auto-detected.

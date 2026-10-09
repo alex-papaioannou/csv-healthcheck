@@ -6,6 +6,7 @@ import argparse
 import csv
 import codecs
 import json
+import gzip
 import sqlite3
 import sys
 import tempfile
@@ -58,7 +59,12 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
             required.append(name.strip())
     issues = []
     missing = duplicates = rows = 0
-    source_context = nullcontext(path) if hasattr(path, "read") else Path(path).open(encoding=encoding, newline="")
+    if hasattr(path, "read"):
+        source_context = nullcontext(path)
+    elif str(path).lower().endswith(".gz"):
+        source_context = gzip.open(path, "rt", encoding=encoding, newline="")
+    else:
+        source_context = Path(path).open(encoding=encoding, newline="")
     with source_context as source, duplicate_index(duplicate_storage) as record:
         reader = csv.reader(source, strict=True, delimiter=delimiter)
         header = next(reader, None)
@@ -105,7 +111,7 @@ def main(argv=None):
         report = inspect_csv(source, delimiter=args.delimiter,
                              required_columns=args.require_column,
                              duplicate_storage=args.duplicate_storage, encoding=args.encoding)
-    except (OSError, UnicodeError, csv.Error, ValueError, LookupError, sqlite3.Error) as error:
+    except (OSError, EOFError, UnicodeError, csv.Error, ValueError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2))
