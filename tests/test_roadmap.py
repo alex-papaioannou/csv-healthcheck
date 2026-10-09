@@ -102,3 +102,8 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(report['issue_details'][0]['column'], 'b')
         self.assertEqual(report['issue_details'][1]['record'], 1)
         self.assertIsNone(report['issue_details'][1]['column'])
+
+    def test_text_report_includes_truncation(self):
+        text = app.render_text(self.inspect('a\n1,2\n', max_issues=0))
+        self.assertIn('Omitted issue messages: 1', text)
+        self.assertNotIn('No quality issues', text)
