@@ -126,3 +126,10 @@ class FeatureTests(unittest.TestCase):
             for extra, text in (([], 'a;b\n1;2\n'), (['--delimiter=,'], 'a,b\n1,2\n')):
                 with mock.patch('sys.stdin', io.StringIO(text)), contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(app.main(['-', '--config', str(config)] + extra), 0)
+
+    def test_bad_config_types_and_unknown_keys_are_actionable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'config.json'
+            for config in ({'required_columns': None}, {'max_issues': True}, {'encoding': 4}, {'typo': 1}, []):
+                path.write_text(json.dumps(config))
+                with self.assertRaises(ValueError): app.load_config(path)
