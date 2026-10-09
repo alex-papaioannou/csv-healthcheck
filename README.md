@@ -36,9 +36,16 @@ and any column order are allowed. Missing required names produce quality issues
 (exit code 1); blank required names are invalid configuration (exit code 2).
 The Python API accepts `required_columns=["symbol", "price"]`.
 
-This is a structural checker, not a data-type or financial-data validator. Duplicate
-detection stores unique rows in memory; use it for files that fit available memory.
-Issue output also grows with the number of malformed records.
+For large files, use `--duplicate-storage disk` (or `duplicate_storage="disk"`
+in Python). Exact row keys are stored in a temporary SQLite database with a
+2 MiB page-cache target. The database is closed and removed on normal completion
+or a handled error. Abrupt process termination can leave temporary files behind.
+The default `memory` mode is faster for smaller files. Disk mode requires enough
+space in the system temporary directory; it performs no network operations.
+
+This is a structural checker, not a data-type or financial-data validator. Disk
+mode bounds the duplicate index's cache, not total process memory: individual rows
+and issue output can still grow with input. There is no automatic mode selection.
 
 ## Development
 
@@ -47,5 +54,5 @@ and pull requests. It checks syntax and runs tests on Python 3.11, 3.12, and 3.1
 The workflow reference is pinned to a specific commit in the shared repository.
 Update that SHA through a pull request when adopting workflow changes.
 
-Useful next contributions: schema validation and an
-optional disk-backed duplicate index. Include tests and usage examples with PRs.
+Useful next contributions: data-type validation and configurable issue limits.
+Include tests and usage examples with PRs.
