@@ -79,3 +79,5 @@ Files ending in `.gz` are decompressed as a stream, including uppercase `.GZ`. U
 `--blank-records skip` omits truly empty records before header selection and validation. The default is `keep`. Quoted empty fields and whitespace-only fields are data records, not blank records. Reported record numbers count retained data records.
 
 `--field-size-limit 1000000` sets a positive maximum field length in characters for this inspection. The previous Python CSV limit is restored even on errors. Calls within this module serialize limit changes; unrelated code calling `csv.field_size_limit` concurrently is outside this lock.
+
+`--max-issues N` limits retained messages without stopping validation. `issue_count` counts all diagnostic messages and `issues_truncated` counts omitted messages. Zero stores no messages but still exits 1 for quality failures. Aggregate missing/duplicate messages each count as one issue.
