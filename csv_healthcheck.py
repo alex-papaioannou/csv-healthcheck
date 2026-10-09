@@ -3,12 +3,45 @@
 import argparse
 import csv
 import json
+import sqlite3
 import sys
+import tempfile
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 
-def inspect_csv(path, delimiter=",", required_columns=()):
-    """Return counts and issues; duplicate detection uses memory proportional to rows."""
+@contextmanager
+def duplicate_index(storage):
+    """Yield a callable that records a row and reports whether it was seen before."""
+    if storage == "memory":
+        seen = set()
+
+        def record(row):
+            key = tuple(row)
+            duplicate = key in seen
+            seen.add(key)
+            return duplicate
+
+        yield record
+    else:
+        with tempfile.TemporaryDirectory(prefix="csv-healthcheck-") as directory:
+            with closing(sqlite3.connect(str(Path(directory) / "rows.sqlite"))) as database:
+                database.execute("PRAGMA cache_size = -2048")
+                database.execute("CREATE TABLE seen (row_key TEXT PRIMARY KEY) WITHOUT ROWID")
+
+                def record(row):
+                    # JSON preserves field boundaries without hash collisions.
+                    key = json.dumps(row, ensure_ascii=True, separators=(",", ":"))
+                    cursor = database.execute("INSERT OR IGNORE INTO seen VALUES (?)", (key,))
+                    return cursor.rowcount == 0
+
+                yield record
+
+
+def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory"):
+    """Return structural quality counts and issues for a CSV file."""
+    if duplicate_storage not in ("memory", "disk"):
+        raise ValueError("duplicate_storage must be 'memory' or 'disk'")
     if not isinstance(delimiter, str) or len(delimiter) != 1 or delimiter in "\r\n\0":
         raise ValueError("delimiter must be one character other than a newline or NUL")
     if isinstance(required_columns, str):
@@ -21,8 +54,8 @@ def inspect_csv(path, delimiter=",", required_columns=()):
             required.append(name.strip())
     issues = []
     missing = duplicates = rows = 0
-    seen = set()
-    with Path(path).open(encoding="utf-8-sig", newline="") as source:
+    with Path(path).open(encoding="utf-8-sig", newline="") as source, \
+            duplicate_index(duplicate_storage) as record:
         reader = csv.reader(source, strict=True, delimiter=delimiter)
         header = next(reader, None)
         if header is None:
@@ -42,10 +75,8 @@ def inspect_csv(path, delimiter=",", required_columns=()):
                 issues.append(f"Record {rows}: expected {len(header)} fields, got {len(row)}")
             missing += sum(not value.strip() for value in row)
             missing += max(0, len(header) - len(row))
-            key = tuple(row)
-            if key in seen:
+            if record(row):
                 duplicates += 1
-            seen.add(key)
     if missing:
         issues.append(f"Missing values: {missing}")
     if duplicates:
@@ -60,11 +91,14 @@ def main(argv=None):
     parser.add_argument("--delimiter", default=",", help="Field separator (default: comma)")
     parser.add_argument("--require-column", action="append", default=[],
                         help="Require a header name; repeat for multiple columns")
+    parser.add_argument("--duplicate-storage", choices=("memory", "disk"), default="memory",
+                        help="Store unique rows in memory or temporary SQLite storage")
     args = parser.parse_args(argv)
     try:
         report = inspect_csv(args.path, delimiter=args.delimiter,
-                             required_columns=args.require_column)
-    except (OSError, UnicodeError, csv.Error, ValueError) as error:
+                             required_columns=args.require_column,
+                             duplicate_storage=args.duplicate_storage)
+    except (OSError, UnicodeError, csv.Error, ValueError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2))

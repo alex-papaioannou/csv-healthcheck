@@ -1,7 +1,9 @@
 import contextlib
+import csv
 import io
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from csv_healthcheck import inspect_csv, main
@@ -13,6 +15,43 @@ class CsvTests(unittest.TestCase):
             path = Path(directory) / "data.csv"
             path.write_text(content, encoding="utf-8")
             return inspect_csv(path, delimiter=delimiter, **options)
+
+    def test_disk_duplicates_match_memory_for_complex_rows(self):
+        content = 'a,b\n"x,y",z\nx,"y,z"\n"x,y",z\n"two\nlines",é\n"two\nlines",é\n'
+        memory = self.report(content)
+        disk = self.report(content, duplicate_storage="disk")
+        self.assertEqual(disk, memory)
+        self.assertEqual(disk["duplicate_rows"], 2)
+
+    def test_disk_index_handles_many_distinct_rows(self):
+        content = "a\n" + "".join(f"{i}\n" for i in range(10000)) + "42\n42\n"
+        result = self.report(content, duplicate_storage="disk")
+        self.assertEqual(result["rows"], 10002)
+        self.assertEqual(result["duplicate_rows"], 2)
+
+    def test_disk_index_cleanup_on_success_and_parse_error(self):
+        factory = tempfile.TemporaryDirectory
+        for content in ("a\n1\n", 'a\n"unterminated'):
+            with self.subTest(content=content), factory() as parent:
+                path = Path(parent) / "data.csv"
+                path.write_text(content, encoding="utf-8")
+                with mock.patch("csv_healthcheck.tempfile.TemporaryDirectory",
+                                side_effect=lambda **kwargs: factory(dir=parent, **kwargs)):
+                    if "unterminated" in content:
+                        with self.assertRaises(csv.Error):
+                            inspect_csv(path, duplicate_storage="disk")
+                    else:
+                        inspect_csv(path, duplicate_storage="disk")
+                self.assertEqual(list(Path(parent).iterdir()), [path])
+
+    def test_disk_cli_and_invalid_storage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "data.csv"
+            path.write_text("a\n1\n1\n", encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(main([str(path), "--duplicate-storage", "disk"]), 1)
+            with self.assertRaises(ValueError):
+                inspect_csv(path, duplicate_storage="unknown")
 
     def test_required_columns_allow_order_and_trim_whitespace(self):
         result = self.report(" value ,name\n1,x\n",
