@@ -8,7 +8,7 @@ import json
 import sqlite3
 import sys
 import tempfile
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, nullcontext
 from pathlib import Path
 
 
@@ -56,8 +56,8 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
             required.append(name.strip())
     issues = []
     missing = duplicates = rows = 0
-    with Path(path).open(encoding="utf-8-sig", newline="") as source, \
-            duplicate_index(duplicate_storage) as record:
+    source_context = nullcontext(path) if hasattr(path, "read") else Path(path).open(encoding="utf-8-sig", newline="")
+    with source_context as source, duplicate_index(duplicate_storage) as record:
         reader = csv.reader(source, strict=True, delimiter=delimiter)
         header = next(reader, None)
         if header is None:
@@ -98,7 +98,8 @@ def main(argv=None):
                         help="Store unique rows in memory or temporary SQLite storage")
     args = parser.parse_args(argv)
     try:
-        report = inspect_csv(args.path, delimiter=args.delimiter,
+        source = sys.stdin if str(args.path) == "-" else args.path
+        report = inspect_csv(source, delimiter=args.delimiter,
                              required_columns=args.require_column,
                              duplicate_storage=args.duplicate_storage)
     except (OSError, UnicodeError, csv.Error, ValueError, sqlite3.Error) as error:
