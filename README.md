@@ -65,3 +65,5 @@ The existing `python csv_healthcheck.py` and `python -m csv_healthcheck` entry p
 Use `csv-healthcheck --version` to print the package version without opening an input file.
 
 Pipe text using `cat data.csv | csv-healthcheck -`. The Python API also accepts text streams and leaves caller-owned streams open. Stdin uses the interpreter's text decoding.
+
+Use `--encoding latin1` (API: `encoding="latin1"`) for explicitly encoded files. The default is UTF-8 with optional BOM. Invalid encoding names and undecodable input return exit code 2; no guessing or lossy replacement is performed.
