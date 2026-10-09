@@ -133,3 +133,8 @@ class FeatureTests(unittest.TestCase):
             for config in ({'required_columns': None}, {'max_issues': True}, {'encoding': 4}, {'typo': 1}, []):
                 path.write_text(json.dumps(config))
                 with self.assertRaises(ValueError): app.load_config(path)
+
+    def test_unexpected_columns(self):
+        report = self.inspect('a,b\n1,2\n', allowed_columns=['a'])
+        self.assertEqual(report['issue_details'][0]['code'], 'unexpected_column')
+        self.assertEqual(report['issue_details'][0]['column'], 'b')
