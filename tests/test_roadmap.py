@@ -45,3 +45,13 @@ class FeatureTests(unittest.TestCase):
             self.assertEqual(app.inspect_csv(path, encoding='latin1')['rows'], 1)
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(app.main([str(path), '--encoding', 'not-an-encoding']), 2)
+
+    def test_gzip_and_truncated_gzip(self):
+        import gzip
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'input.csv.gz'
+            path.write_bytes(gzip.compress(b'a\n1\n'))
+            self.assertEqual(app.inspect_csv(path)['rows'], 1)
+            path.write_bytes(path.read_bytes()[:12])
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(app.main([str(path)]), 2)
