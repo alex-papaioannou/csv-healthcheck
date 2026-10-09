@@ -87,3 +87,5 @@ Files ending in `.gz` are decompressed as a stream, including uppercase `.GZ`. U
 Diagnostic `record` is a one-based retained data-record number (multiline fields count as one record). `column` is a header name when applicable. Header, aggregate, and file-level diagnostics use null where no specific location applies.
 
 `--format text` prints a compact human-readable report, including omitted-message counts. JSON remains the default; formatting does not change validation or exit status.
+
+`--output report.json` writes UTF-8 to a temporary file beside the destination and atomically replaces it after writing. Existing reports remain intact if writing or replacement fails; failures return 2. Parent directories must exist. The input path cannot also be the output path.
