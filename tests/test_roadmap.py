@@ -91,3 +91,8 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(len(report['issues']), 1)
         with mock.patch('sys.stdin', io.StringIO('a\n1,2\n')), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(app.main(['-', '--max-issues', '0']), 1)
+
+    def test_machine_readable_issue_codes(self):
+        report = self.inspect('a\n1,2\n')
+        self.assertEqual(report['issue_details'][0]['code'], 'row_width')
+        self.assertEqual(report['issue_details'][0]['message'], report['issues'][0])

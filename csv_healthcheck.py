@@ -38,11 +38,13 @@ class Issues(list):
         super().__init__()
         self.limit = limit
         self.total = 0
+        self.details = []
 
-    def append(self, message):
+    def append(self, message, code="quality"):
         self.total += 1
         if self.limit is None or len(self) < self.limit:
             super().append(message)
+            self.details.append({"code": code, "message": message})
 
 
 @contextmanager
@@ -113,36 +115,36 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
             reader = (row for row in reader if row)
         header = next(reader, None)
         if header is None:
-            issues.append("Empty file")
+            issues.append("Empty file", "empty_file")
             return {"rows": 0, "columns": 0, "missing_values": 0,
                     "duplicate_rows": 0, "issues": issues, "issue_count": issues.total,
-                    "issues_truncated": issues.total - len(issues)}
+                    "issue_details": issues.details, "issues_truncated": issues.total - len(issues)}
         if not has_header:
             reader = itertools.chain([header], reader)
             header = [f"column_{i + 1}" for i in range(len(header))]
         names = [name.strip() for name in header]
         if not names or any(not name for name in names):
-            issues.append("Header contains an empty column name")
+            issues.append("Header contains an empty column name", "empty_header")
         if len(set(names)) != len(names):
-            issues.append("Header contains duplicate column names")
+            issues.append("Header contains duplicate column names", "duplicate_header")
         for name in required:
             if name not in names:
-                issues.append(f"Missing required column: {name}")
+                issues.append(f"Missing required column: {name}", "required_column")
         for row in reader:
             rows += 1
             if len(row) != len(header):
-                issues.append(f"Record {rows}: expected {len(header)} fields, got {len(row)}")
+                issues.append(f"Record {rows}: expected {len(header)} fields, got {len(row)}", "row_width")
             missing += sum(not value.strip() for value in row)
             missing += max(0, len(header) - len(row))
             if record(row):
                 duplicates += 1
     if missing:
-        issues.append(f"Missing values: {missing}")
+        issues.append(f"Missing values: {missing}", "missing_values")
     if duplicates:
-        issues.append(f"Duplicate rows: {duplicates}")
+        issues.append(f"Duplicate rows: {duplicates}", "duplicate_rows")
     return {"rows": rows, "columns": len(header), "missing_values": missing,
             "duplicate_rows": duplicates, "issues": issues, "issue_count": issues.total,
-            "issues_truncated": issues.total - len(issues)}
+            "issue_details": issues.details, "issues_truncated": issues.total - len(issues)}
 
 
 def main(argv=None):

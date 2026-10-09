@@ -81,3 +81,5 @@ Files ending in `.gz` are decompressed as a stream, including uppercase `.GZ`. U
 `--field-size-limit 1000000` sets a positive maximum field length in characters for this inspection. The previous Python CSV limit is restored even on errors. Calls within this module serialize limit changes; unrelated code calling `csv.field_size_limit` concurrently is outside this lock.
 
 `--max-issues N` limits retained messages without stopping validation. `issue_count` counts all diagnostic messages and `issues_truncated` counts omitted messages. Zero stores no messages but still exits 1 for quality failures. Aggregate missing/duplicate messages each count as one issue.
+
+`issue_details` adds stable machine-readable `code` and `message` fields alongside the backward-compatible `issues` string list. Both lists obey `max_issues`. Codes include `empty_file`, `empty_header`, `duplicate_header`, `required_column`, `row_width`, `missing_values`, and `duplicate_rows`.
