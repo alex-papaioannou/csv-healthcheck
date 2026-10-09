@@ -71,3 +71,5 @@ Use `--encoding latin1` (API: `encoding="latin1"`) for explicitly encoded files.
 Files ending in `.gz` are decompressed as a stream, including uppercase `.GZ`. Use `csv-healthcheck input.csv.gz`; malformed or truncated gzip input returns exit code 2. Compressed stdin is not auto-detected.
 
 `--quotechar` selects a single quoting character (default double quote). For example, use `--quotechar "'"` for single-quoted fields; newline and NUL are rejected.
+
+`--escapechar` enables CSV escaping, for example `--escapechar '!'` treats `x!,y` as one field. Escaping is disabled by default; doubled quotes remain supported.
