@@ -107,3 +107,14 @@ class FeatureTests(unittest.TestCase):
         text = app.render_text(self.inspect('a\n1,2\n', max_issues=0))
         self.assertIn('Omitted issue messages: 1', text)
         self.assertNotIn('No quality issues', text)
+
+    def test_atomic_report_preserves_previous_on_replace_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'report.json'
+            path.write_text('previous')
+            with mock.patch('csv_healthcheck.os.replace', side_effect=OSError('failure')):
+                with self.assertRaises(OSError): app.write_report(path, 'new')
+            self.assertEqual(path.read_text(), 'previous')
+            self.assertEqual(list(Path(directory).iterdir()), [path])
+            app.write_report(path, 'new')
+            self.assertEqual(path.read_text(), 'new\n')

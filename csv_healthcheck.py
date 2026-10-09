@@ -8,6 +8,7 @@ import codecs
 import json
 import gzip
 import itertools
+import os
 import threading
 import sqlite3
 import sys
@@ -158,6 +159,22 @@ def render_text(report):
     return "\n".join(lines)
 
 
+def write_report(path, content):
+    target = Path(path)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n",
+                                         dir=target.parent, prefix=".csv-report-", delete=False) as out:
+            temporary = Path(out.name)
+            out.write(content + "\n")
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(temporary, target)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -175,8 +192,11 @@ def main(argv=None):
     parser.add_argument("--field-size-limit", type=int, help="Maximum CSV field length in characters")
     parser.add_argument("--max-issues", type=int, help="Maximum stored messages; counts remain complete")
     parser.add_argument("--format", choices=("json", "text"), default="json")
+    parser.add_argument("--output", type=Path, help="Atomically replace a report file")
     args = parser.parse_args(argv)
     try:
+        if args.output and str(args.path) != "-" and args.output.resolve() == args.path.resolve():
+            raise ValueError("Output must not overwrite input")
         source = sys.stdin if str(args.path) == "-" else args.path
         report = inspect_csv(source, delimiter=args.delimiter,
                              required_columns=args.require_column,
@@ -184,7 +204,15 @@ def main(argv=None):
     except (OSError, EOFError, UnicodeError, csv.Error, ValueError, OverflowError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
-    print(render_text(report) if args.format == "text" else json.dumps(report, indent=2))
+    content = render_text(report) if args.format == "text" else json.dumps(report, indent=2)
+    try:
+        if args.output:
+            write_report(args.output, content)
+        else:
+            print(content)
+    except OSError as error:
+        print(f"Unable to write report: {error}", file=sys.stderr)
+        return 2
     return 1 if report["issue_count"] else 0
 
 
