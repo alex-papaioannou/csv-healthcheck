@@ -92,7 +92,7 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
         raise ValueError("duplicate_storage must be 'memory' or 'disk'")
     if not isinstance(delimiter, str) or len(delimiter) != 1 or delimiter in "\r\n\0":
         raise ValueError("delimiter must be one character other than a newline or NUL")
-    if isinstance(required_columns, str):
+    if not isinstance(required_columns, (list, tuple)):
         raise ValueError("required_columns must be a sequence of column names")
     required = []
     for name in required_columns:
@@ -185,6 +185,19 @@ def load_config(path):
     unknown = set(config) - allowed
     if unknown:
         raise ValueError("Unknown configuration keys: " + ", ".join(sorted(unknown)))
+    string_keys = ("delimiter", "encoding", "quotechar", "duplicate_storage", "blank_records")
+    for key in string_keys:
+        if key in config and not isinstance(config[key], str):
+            raise ValueError(f"{key} must be a string")
+    for key in ("required_columns",):
+        if key in config and (not isinstance(config[key], list) or any(not isinstance(v, str) for v in config[key])):
+            raise ValueError(f"{key} must be an array of strings")
+    if "header" in config and not isinstance(config["header"], bool):
+        raise ValueError("header must be boolean")
+    for key in ("max_issues", "field_size_limit"):
+        value = config.get(key)
+        if value is not None and (type(value) is not int or value < (1 if key == "field_size_limit" else 0)):
+            raise ValueError(f"{key} has an invalid integer value")
     return config
 
 
