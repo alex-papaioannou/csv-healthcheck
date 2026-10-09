@@ -42,8 +42,10 @@ def duplicate_index(storage):
                 yield record
 
 
-def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig"):
+def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"'):
     """Return structural quality counts and issues for a CSV file."""
+    if not isinstance(quotechar, str) or len(quotechar) != 1 or quotechar in "\r\n\0":
+        raise ValueError("quotechar must be one character other than a newline or NUL")
     codecs.lookup(encoding)
     if duplicate_storage not in ("memory", "disk"):
         raise ValueError("duplicate_storage must be 'memory' or 'disk'")
@@ -66,7 +68,7 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
     else:
         source_context = Path(path).open(encoding=encoding, newline="")
     with source_context as source, duplicate_index(duplicate_storage) as record:
-        reader = csv.reader(source, strict=True, delimiter=delimiter)
+        reader = csv.reader(source, strict=True, delimiter=delimiter, quotechar=quotechar)
         header = next(reader, None)
         if header is None:
             return {"rows": 0, "columns": 0, "missing_values": 0,
@@ -105,12 +107,13 @@ def main(argv=None):
     parser.add_argument("--duplicate-storage", choices=("memory", "disk"), default="memory",
                         help="Store unique rows in memory or temporary SQLite storage")
     parser.add_argument("--encoding", default="utf-8-sig", help="File text encoding; streams are already decoded")
+    parser.add_argument("--quotechar", default='"', help="Single quoting character")
     args = parser.parse_args(argv)
     try:
         source = sys.stdin if str(args.path) == "-" else args.path
         report = inspect_csv(source, delimiter=args.delimiter,
                              required_columns=args.require_column,
-                             duplicate_storage=args.duplicate_storage, encoding=args.encoding)
+                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar)
     except (OSError, EOFError, UnicodeError, csv.Error, ValueError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2

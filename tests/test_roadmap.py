@@ -55,3 +55,7 @@ class FeatureTests(unittest.TestCase):
             path.write_bytes(path.read_bytes()[:12])
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(app.main([str(path)]), 2)
+
+    def test_custom_quote_character(self):
+        self.assertEqual(self.inspect("a,b\n'x,y',1\n", quotechar="'")['issues'], [])
+        with self.assertRaises(ValueError): self.inspect('a\n1\n', quotechar='xx')
