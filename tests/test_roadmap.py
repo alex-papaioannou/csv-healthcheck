@@ -21,3 +21,10 @@ class FeatureTests(unittest.TestCase):
         module, name = config['project']['scripts']['csv-healthcheck'].split(':')
         self.assertTrue(callable(getattr(importlib.import_module(module), name)))
         self.assertEqual(config['project']['dependencies'], [])
+
+    def test_version_without_input(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), self.assertRaises(SystemExit) as result:
+            app.main(['--version'])
+        self.assertEqual(result.exception.code, 0)
+        self.assertIn(app.__version__, output.getvalue())
