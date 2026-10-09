@@ -63,3 +63,9 @@ class FeatureTests(unittest.TestCase):
     def test_escaped_separator(self):
         self.assertEqual(self.inspect('a,b\nx!,y,1\n', escapechar='!')['issues'], [])
         with self.assertRaises(ValueError): self.inspect('a\n1\n', escapechar='')
+
+    def test_headerless_first_record_is_data(self):
+        report = self.inspect('1,2\n1,2\n', header=False, required_columns=['column_2'])
+        self.assertEqual(report['rows'], 2)
+        self.assertEqual(report['duplicate_rows'], 1)
+        self.assertNotIn('Missing required column: column_2', report['issues'])
