@@ -95,3 +95,9 @@ Diagnostic `record` is a one-based retained data-record number (multiline fields
 `--config rules.json` loads inspection options using Python API names, such as `{"delimiter":";","required_columns":["id"]}`. Explicit CLI options override corresponding configuration values; unspecified options retain configured values. Unknown keys are rejected. CLI long-option abbreviations are disabled to keep precedence unambiguous.
 
 Configuration errors identify unknown keys or invalid value types. Column lists must be arrays of strings, booleans must be JSON booleans, and issue/field limits must be integers (not booleans). Invalid configuration returns exit code 2.
+
+## Additional implemented features
+
+- Reject unexpected CSV columns against an allowed set.
+
+Use JSON configuration keys matching the Python API for schema and batch options.
