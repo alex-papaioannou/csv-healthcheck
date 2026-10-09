@@ -28,3 +28,12 @@ class FeatureTests(unittest.TestCase):
             app.main(['--version'])
         self.assertEqual(result.exception.code, 0)
         self.assertIn(app.__version__, output.getvalue())
+
+    def test_stream_and_stdin_are_not_closed(self):
+        stream = io.StringIO('a\n1\n')
+        self.assertEqual(app.inspect_csv(stream)['rows'], 1)
+        self.assertFalse(stream.closed)
+        stream.seek(0)
+        with mock.patch('sys.stdin', stream), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(app.main(['-']), 0)
+        self.assertFalse(stream.closed)
