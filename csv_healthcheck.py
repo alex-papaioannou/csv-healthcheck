@@ -43,8 +43,10 @@ def duplicate_index(storage):
                 yield record
 
 
-def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"', escapechar=None, header=True):
+def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"', escapechar=None, header=True, blank_records="keep"):
     """Return structural quality counts and issues for a CSV file."""
+    if blank_records not in ("keep", "skip"):
+        raise ValueError("blank_records must be keep or skip")
     if not isinstance(header, bool):
         raise ValueError("header must be boolean")
     if not isinstance(quotechar, str) or len(quotechar) != 1 or quotechar in "\r\n\0":
@@ -75,6 +77,8 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
         source_context = Path(path).open(encoding=encoding, newline="")
     with source_context as source, duplicate_index(duplicate_storage) as record:
         reader = csv.reader(source, strict=True, delimiter=delimiter, quotechar=quotechar, escapechar=escapechar)
+        if blank_records == "skip":
+            reader = (row for row in reader if row)
         header = next(reader, None)
         if header is None:
             return {"rows": 0, "columns": 0, "missing_values": 0,
@@ -119,12 +123,13 @@ def main(argv=None):
     parser.add_argument("--quotechar", default='"', help="Single quoting character")
     parser.add_argument("--escapechar", help="Optional CSV escape character")
     parser.add_argument("--no-header", action="store_true", help="Generate column_1, column_2, ... names")
+    parser.add_argument("--blank-records", choices=("keep", "skip"), default="keep")
     args = parser.parse_args(argv)
     try:
         source = sys.stdin if str(args.path) == "-" else args.path
         report = inspect_csv(source, delimiter=args.delimiter,
                              required_columns=args.require_column,
-                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar, escapechar=args.escapechar, header=not args.no_header)
+                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar, escapechar=args.escapechar, header=not args.no_header, blank_records=args.blank_records)
     except (OSError, EOFError, UnicodeError, csv.Error, ValueError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2

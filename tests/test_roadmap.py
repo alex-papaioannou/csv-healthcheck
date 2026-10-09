@@ -69,3 +69,9 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(report['rows'], 2)
         self.assertEqual(report['duplicate_rows'], 1)
         self.assertNotIn('Missing required column: column_2', report['issues'])
+
+    def test_blank_record_policy(self):
+        self.assertEqual(self.inspect('a\n\n1\n')['rows'], 2)
+        report = self.inspect('\na\n\n1\n""\n', blank_records='skip')
+        self.assertEqual(report['rows'], 2)
+        self.assertEqual(report['missing_values'], 1)
