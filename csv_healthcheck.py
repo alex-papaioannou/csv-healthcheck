@@ -33,6 +33,18 @@ def field_limit(value):
             csv.field_size_limit(previous)
 
 
+class Issues(list):
+    def __init__(self, limit):
+        super().__init__()
+        self.limit = limit
+        self.total = 0
+
+    def append(self, message):
+        self.total += 1
+        if self.limit is None or len(self) < self.limit:
+            super().append(message)
+
+
 @contextmanager
 def duplicate_index(storage):
     """Yield a callable that records a row and reports whether it was seen before."""
@@ -61,7 +73,7 @@ def duplicate_index(storage):
                 yield record
 
 
-def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"', escapechar=None, header=True, blank_records="keep", field_size_limit=None):
+def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="memory", encoding="utf-8-sig", quotechar='"', escapechar=None, header=True, blank_records="keep", field_size_limit=None, max_issues=None):
     """Return structural quality counts and issues for a CSV file."""
     if blank_records not in ("keep", "skip"):
         raise ValueError("blank_records must be keep or skip")
@@ -84,7 +96,9 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
             raise ValueError("required column names must be nonempty strings")
         if name.strip() not in required:
             required.append(name.strip())
-    issues = []
+    if max_issues is not None and (isinstance(max_issues, bool) or not isinstance(max_issues, int) or max_issues < 0):
+        raise ValueError("max_issues must be a nonnegative integer")
+    issues = Issues(max_issues)
     has_header = header
     missing = duplicates = rows = 0
     if hasattr(path, "read"):
@@ -99,8 +113,10 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
             reader = (row for row in reader if row)
         header = next(reader, None)
         if header is None:
+            issues.append("Empty file")
             return {"rows": 0, "columns": 0, "missing_values": 0,
-                    "duplicate_rows": 0, "issues": ["Empty file"]}
+                    "duplicate_rows": 0, "issues": issues, "issue_count": issues.total,
+                    "issues_truncated": issues.total - len(issues)}
         if not has_header:
             reader = itertools.chain([header], reader)
             header = [f"column_{i + 1}" for i in range(len(header))]
@@ -125,7 +141,8 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
     if duplicates:
         issues.append(f"Duplicate rows: {duplicates}")
     return {"rows": rows, "columns": len(header), "missing_values": missing,
-            "duplicate_rows": duplicates, "issues": issues}
+            "duplicate_rows": duplicates, "issues": issues, "issue_count": issues.total,
+            "issues_truncated": issues.total - len(issues)}
 
 
 def main(argv=None):
@@ -143,17 +160,18 @@ def main(argv=None):
     parser.add_argument("--no-header", action="store_true", help="Generate column_1, column_2, ... names")
     parser.add_argument("--blank-records", choices=("keep", "skip"), default="keep")
     parser.add_argument("--field-size-limit", type=int, help="Maximum CSV field length in characters")
+    parser.add_argument("--max-issues", type=int, help="Maximum stored messages; counts remain complete")
     args = parser.parse_args(argv)
     try:
         source = sys.stdin if str(args.path) == "-" else args.path
         report = inspect_csv(source, delimiter=args.delimiter,
                              required_columns=args.require_column,
-                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar, escapechar=args.escapechar, header=not args.no_header, blank_records=args.blank_records, field_size_limit=args.field_size_limit)
+                             duplicate_storage=args.duplicate_storage, encoding=args.encoding, quotechar=args.quotechar, escapechar=args.escapechar, header=not args.no_header, blank_records=args.blank_records, field_size_limit=args.field_size_limit, max_issues=args.max_issues)
     except (OSError, EOFError, UnicodeError, csv.Error, ValueError, OverflowError, LookupError, sqlite3.Error) as error:
         print(f"Unable to inspect CSV: {error}", file=sys.stderr)
         return 2
     print(json.dumps(report, indent=2))
-    return 1 if report["issues"] else 0
+    return 1 if report["issue_count"] else 0
 
 
 if __name__ == "__main__":

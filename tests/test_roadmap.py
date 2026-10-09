@@ -83,3 +83,11 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(csv.field_size_limit(), previous)
         self.assertEqual(self.inspect('a\nlongvalue\n', field_size_limit=20)['rows'], 1)
         with self.assertRaises(ValueError): self.inspect('a\n1\n', field_size_limit=0)
+
+    def test_issue_cap_preserves_totals_and_failure(self):
+        report = self.inspect('a\n1,2\n3,4\n5,6\n', max_issues=1)
+        self.assertEqual(report['issue_count'], 3)
+        self.assertEqual(report['issues_truncated'], 2)
+        self.assertEqual(len(report['issues']), 1)
+        with mock.patch('sys.stdin', io.StringIO('a\n1,2\n')), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(app.main(['-', '--max-issues', '0']), 1)
