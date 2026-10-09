@@ -40,11 +40,11 @@ class Issues(list):
         self.total = 0
         self.details = []
 
-    def append(self, message, code="quality"):
+    def append(self, message, code="quality", record=None, column=None):
         self.total += 1
         if self.limit is None or len(self) < self.limit:
             super().append(message)
-            self.details.append({"code": code, "message": message})
+            self.details.append({"code": code, "message": message, "record": record, "column": column})
 
 
 @contextmanager
@@ -129,11 +129,11 @@ def inspect_csv(path, delimiter=",", required_columns=(), duplicate_storage="mem
             issues.append("Header contains duplicate column names", "duplicate_header")
         for name in required:
             if name not in names:
-                issues.append(f"Missing required column: {name}", "required_column")
+                issues.append(f"Missing required column: {name}", "required_column", column=name)
         for row in reader:
             rows += 1
             if len(row) != len(header):
-                issues.append(f"Record {rows}: expected {len(header)} fields, got {len(row)}", "row_width")
+                issues.append(f"Record {rows}: expected {len(header)} fields, got {len(row)}", "row_width", record=rows)
             missing += sum(not value.strip() for value in row)
             missing += max(0, len(header) - len(row))
             if record(row):

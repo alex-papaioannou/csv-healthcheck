@@ -96,3 +96,9 @@ class FeatureTests(unittest.TestCase):
         report = self.inspect('a\n1,2\n')
         self.assertEqual(report['issue_details'][0]['code'], 'row_width')
         self.assertEqual(report['issue_details'][0]['message'], report['issues'][0])
+
+    def test_issue_locations(self):
+        report = self.inspect('a\n"two\nlines",2\n', required_columns=['b'])
+        self.assertEqual(report['issue_details'][0]['column'], 'b')
+        self.assertEqual(report['issue_details'][1]['record'], 1)
+        self.assertIsNone(report['issue_details'][1]['column'])
